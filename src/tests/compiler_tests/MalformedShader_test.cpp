@@ -49,9 +49,23 @@ class MalformedShaderTest : public testing::Test
 
   protected:
     std::string mInfoLog;
-
-  private:
     TranslatorESSL *mTranslator;
+};
+
+class MalformedVertexShaderTest : public MalformedShaderTest
+{
+  public:
+    MalformedVertexShaderTest() {}
+
+  protected:
+    void SetUp() override
+    {
+        ShBuiltInResources resources;
+        ShInitBuiltInResources(&resources);
+
+        mTranslator = new TranslatorESSL(GL_VERTEX_SHADER, SH_GLES3_SPEC);
+        ASSERT_TRUE(mTranslator->Init(resources));
+    }
 };
 
 // This is a test for a bug that used to exist in ANGLE:
@@ -508,6 +522,74 @@ TEST_F(MalformedShaderTest, AssignUniformToGlobalESSL1)
     }
 }
 
+// Global variable initializers need to be constant expressions (ESSL 1.00 section 4.3)
+// Initializing with an user-defined function call should be an error.
+TEST_F(MalformedShaderTest, AssignFunctionCallToGlobal)
+{
+    const std::string &shaderString =
+        "precision mediump float;\n"
+        "float foo() { return 1.0; }\n"
+        "float b = foo();\n"
+        "void main() {\n"
+        "   gl_FragColor = vec4(b);\n"
+        "}\n";
+    if (compile(shaderString))
+    {
+        FAIL() << "Shader compilation succeeded, expecting failure " << mInfoLog;
+    }
+}
+
+// Global variable initializers need to be constant expressions (ESSL 1.00 section 4.3)
+// Initializing with an assignment to another global should be an error.
+TEST_F(MalformedShaderTest, AssignAssignmentToGlobal)
+{
+    const std::string &shaderString =
+        "precision mediump float;\n"
+        "float c = 1.0;\n"
+        "float b = (c = 0.0);\n"
+        "void main() {\n"
+        "   gl_FragColor = vec4(b);\n"
+        "}\n";
+    if (compile(shaderString))
+    {
+        FAIL() << "Shader compilation succeeded, expecting failure " << mInfoLog;
+    }
+}
+
+// Global variable initializers need to be constant expressions (ESSL 1.00 section 4.3)
+// Initializing with incrementing another global should be an error.
+TEST_F(MalformedShaderTest, AssignIncrementToGlobal)
+{
+    const std::string &shaderString =
+        "precision mediump float;\n"
+        "float c = 1.0;\n"
+        "float b = (c++);\n"
+        "void main() {\n"
+        "   gl_FragColor = vec4(b);\n"
+        "}\n";
+    if (compile(shaderString))
+    {
+        FAIL() << "Shader compilation succeeded, expecting failure " << mInfoLog;
+    }
+}
+
+// Global variable initializers need to be constant expressions (ESSL 1.00 section 4.3)
+// Initializing with a texture lookup function call should be an error.
+TEST_F(MalformedShaderTest, AssignTexture2DToGlobal)
+{
+    const std::string &shaderString =
+        "precision mediump float;\n"
+        "uniform mediump sampler2D s;\n"
+        "float b = texture2D(s, vec2(0.5, 0.5)).x;\n"
+        "void main() {\n"
+        "   gl_FragColor = vec4(b);\n"
+        "}\n";
+    if (compile(shaderString))
+    {
+        FAIL() << "Shader compilation succeeded, expecting failure " << mInfoLog;
+    }
+}
+
 // Global variable initializers need to be constant expressions (ESSL 3.00 section 4.3)
 // Initializing with a non-constant global should be an error.
 TEST_F(MalformedShaderTest, AssignNonConstGlobalToGlobal)
@@ -577,5 +659,260 @@ TEST_F(MalformedShaderTest, VersionOnSecondLine)
     if (compile(shaderString))
     {
         FAIL() << "Shader compilation succeeded, expecting failure " << mInfoLog;
+    }
+}
+
+// Layout qualifier can only appear in global scope (ESSL 3.00 section 4.3.8)
+TEST_F(MalformedShaderTest, LayoutQualifierInCondition)
+{
+    const std::string &shaderString =
+        "#version 300 es\n"
+        "precision mediump float;\n"
+        "uniform vec4 u;\n"
+        "out vec4 my_FragColor;\n"
+        "void main() {\n"
+        "    int i = 0;\n"
+        "    for (int j = 0; layout(location = 0) bool b = false; ++j) {\n"
+        "        ++i;\n"
+        "    }\n"
+        "    my_FragColor = u;\n"
+        "}\n";
+    if (compile(shaderString))
+    {
+        FAIL() << "Shader compilation succeeded, expecting failure " << mInfoLog;
+    }
+}
+
+// Layout qualifier can only appear where specified (ESSL 3.00 section 4.3.8)
+TEST_F(MalformedShaderTest, LayoutQualifierInFunctionReturnType)
+{
+    const std::string &shaderString =
+        "#version 300 es\n"
+        "precision mediump float;\n"
+        "uniform vec4 u;\n"
+        "out vec4 my_FragColor;\n"
+        "layout(location = 0) vec4 foo() {\n"
+        "    return u;\n"
+        "}\n"
+        "void main() {\n"
+        "    my_FragColor = foo();\n"
+        "}\n";
+    if (compile(shaderString))
+    {
+        FAIL() << "Shader compilation succeeded, expecting failure " << mInfoLog;
+    }
+}
+
+// If there is more than one output, the location must be specified for all outputs.
+// (ESSL 3.00.04 section 4.3.8.2)
+TEST_F(MalformedShaderTest, TwoOutputsNoLayoutQualifiers)
+{
+    const std::string &shaderString =
+        "#version 300 es\n"
+        "precision mediump float;\n"
+        "uniform vec4 u;\n"
+        "out vec4 my_FragColor;\n"
+        "out vec4 my_SecondaryFragColor;\n"
+        "void main() {\n"
+        "    my_FragColor = vec4(1.0);\n"
+        "    my_SecondaryFragColor = vec4(0.5);\n"
+        "}\n";
+    if (compile(shaderString))
+    {
+        FAIL() << "Shader compilation succeeded, expecting failure " << mInfoLog;
+    }
+}
+
+// (ESSL 3.00.04 section 4.3.8.2)
+TEST_F(MalformedShaderTest, TwoOutputsFirstLayoutQualifier)
+{
+    const std::string &shaderString =
+        "#version 300 es\n"
+        "precision mediump float;\n"
+        "uniform vec4 u;\n"
+        "layout(location = 0) out vec4 my_FragColor;\n"
+        "out vec4 my_SecondaryFragColor;\n"
+        "void main() {\n"
+        "    my_FragColor = vec4(1.0);\n"
+        "    my_SecondaryFragColor = vec4(0.5);\n"
+        "}\n";
+    if (compile(shaderString))
+    {
+        FAIL() << "Shader compilation succeeded, expecting failure " << mInfoLog;
+    }
+}
+
+// (ESSL 3.00.04 section 4.3.8.2)
+TEST_F(MalformedShaderTest, TwoOutputsSecondLayoutQualifier)
+{
+    const std::string &shaderString =
+        "#version 300 es\n"
+        "precision mediump float;\n"
+        "uniform vec4 u;\n"
+        "out vec4 my_FragColor;\n"
+        "layout(location = 0) out vec4 my_SecondaryFragColor;\n"
+        "void main() {\n"
+        "    my_FragColor = vec4(1.0);\n"
+        "    my_SecondaryFragColor = vec4(0.5);\n"
+        "}\n";
+    if (compile(shaderString))
+    {
+        FAIL() << "Shader compilation succeeded, expecting failure " << mInfoLog;
+    }
+}
+
+// Uniforms can be arrays (ESSL 3.00 section 4.3.5)
+TEST_F(MalformedShaderTest, UniformArray)
+{
+    const std::string &shaderString =
+        "#version 300 es\n"
+        "precision mediump float;\n"
+        "uniform vec4[2] u;\n"
+        "out vec4 my_FragColor;\n"
+        "void main() {\n"
+        "    my_FragColor = u[0];\n"
+        "}\n";
+    if (!compile(shaderString))
+    {
+        FAIL() << "Shader compilation failed, expecting success " << mInfoLog;
+    }
+}
+
+// Fragment shader input variables cannot be arrays of structs (ESSL 3.00 section 4.3.4)
+TEST_F(MalformedShaderTest, FragmentInputArrayOfStructs)
+{
+    const std::string &shaderString =
+        "#version 300 es\n"
+        "precision mediump float;\n"
+        "struct S {\n"
+        "    vec4 foo;\n"
+        "};\n"
+        "in S i[2];\n"
+        "out vec4 my_FragColor;\n"
+        "void main() {\n"
+        "    my_FragColor = i[0].foo;\n"
+        "}\n";
+    if (compile(shaderString))
+    {
+        FAIL() << "Shader compilation succeeded, expecting failure " << mInfoLog;
+    }
+}
+
+// Vertex shader inputs can't be arrays (ESSL 3.00 section 4.3.4)
+// This test is testing the case where the array brackets are after the variable name, so
+// the arrayness isn't known when the type and qualifiers are initially parsed.
+TEST_F(MalformedVertexShaderTest, VertexShaderInputArray)
+{
+    const std::string &shaderString =
+        "#version 300 es\n"
+        "precision mediump float;\n"
+        "in vec4 i[2];\n"
+        "void main() {\n"
+        "    gl_Position = i[0];\n"
+        "}\n";
+    if (compile(shaderString))
+    {
+        FAIL() << "Shader compilation succeeded, expecting failure " << mInfoLog;
+    }
+}
+
+// Vertex shader inputs can't be arrays (ESSL 3.00 section 4.3.4)
+// This test is testing the case where the array brackets are after the type.
+TEST_F(MalformedVertexShaderTest, VertexShaderInputArrayType)
+{
+    const std::string &shaderString =
+        "#version 300 es\n"
+        "precision mediump float;\n"
+        "in vec4[2] i;\n"
+        "void main() {\n"
+        "    gl_Position = i[0];\n"
+        "}\n";
+    if (compile(shaderString))
+    {
+        FAIL() << "Shader compilation succeeded, expecting failure " << mInfoLog;
+    }
+}
+
+// Fragment shader inputs can't contain booleans (ESSL 3.00 section 4.3.4)
+TEST_F(MalformedShaderTest, FragmentShaderInputStructWithBool)
+{
+    const std::string &shaderString =
+        "#version 300 es\n"
+        "precision mediump float;\n"
+        "struct S {\n"
+        "    bool foo;\n"
+        "};\n"
+        "in S s;\n"
+        "out vec4 my_FragColor;\n"
+        "void main() {\n"
+        "    my_FragColor = vec4(0.0);\n"
+        "}\n";
+    if (compile(shaderString))
+    {
+        FAIL() << "Shader compilation succeeded, expecting failure " << mInfoLog;
+    }
+}
+
+// Fragment shader inputs without a flat qualifier can't contain integers (ESSL 3.00 section 4.3.4)
+TEST_F(MalformedShaderTest, FragmentShaderInputStructWithInt)
+{
+    const std::string &shaderString =
+        "#version 300 es\n"
+        "precision mediump float;\n"
+        "struct S {\n"
+        "    int foo;\n"
+        "};\n"
+        "in S s;\n"
+        "out vec4 my_FragColor;\n"
+        "void main() {\n"
+        "    my_FragColor = vec4(0.0);\n"
+        "}\n";
+    if (compile(shaderString))
+    {
+        FAIL() << "Shader compilation succeeded, expecting failure " << mInfoLog;
+    }
+}
+
+// Selecting a field of a vector that's the result of dynamic indexing a constant array should work.
+TEST_F(MalformedShaderTest, ShaderSelectingFieldOfVectorIndexedFromArray)
+{
+    const std::string &shaderString =
+        "#version 300 es\n"
+        "precision mediump float;\n"
+        "out vec4 my_FragColor;\n"
+        "uniform int i;\n"
+        "void main() {\n"
+        "    float f = vec2[1](vec2(0.0, 0.1))[i].x;\n"
+        "    my_FragColor = vec4(f);\n"
+        "}\n";
+    if (!compile(shaderString))
+    {
+        FAIL() << "Shader compilation failed, expecting success " << mInfoLog;
+    }
+}
+
+// Passing an array into a function and then passing a value from that array into another function
+// should work. This is a regression test for a bug where the mangled name of a TType was not
+// properly updated when determining the type resulting from array indexing.
+TEST_F(MalformedShaderTest, ArrayValueFromFunctionParameterAsParameter)
+{
+    const std::string &shaderString =
+        "precision mediump float;\n"
+        "uniform float u;\n"
+        "float foo(float f) {\n"
+        "   return f * 2.0;\n"
+        "}\n"
+        "float bar(float[2] f) {\n"
+        "    return foo(f[0]);\n"
+        "}\n"
+        "void main()\n"
+        "{\n"
+        "    float arr[2];\n"
+        "    arr[0] = u;\n"
+        "    gl_FragColor = vec4(bar(arr));\n"
+        "}\n";
+    if (!compile(shaderString))
+    {
+        FAIL() << "Shader compilation failed, expecting success " << mInfoLog;
     }
 }

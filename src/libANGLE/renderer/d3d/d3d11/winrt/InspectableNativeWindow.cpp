@@ -11,9 +11,10 @@
 
 namespace rx
 {
-NativeWindow::NativeWindow(EGLNativeWindowType window)
+NativeWindow::NativeWindow(EGLNativeWindowType window, const egl::Config *config)
 {
     mWindow = window;
+    mConfig = config;
 }
 
 bool NativeWindow::initialize()
@@ -83,7 +84,9 @@ HRESULT NativeWindow::createSwapChain(ID3D11Device *device, DXGIFactory *factory
 {
     if (mImpl)
     {
-        return mImpl->createSwapChain(device, factory, format, width, height, swapChain);
+        bool containsAlpha = (mConfig->alphaSize > 0);
+        return mImpl->createSwapChain(device, factory, format, width, height, containsAlpha,
+                                      swapChain);
     }
 
     return E_UNEXPECTED;
@@ -199,7 +202,7 @@ bool IsEGLConfiguredPropertySet(EGLNativeWindowType window, ABI::Windows::Founda
 // ICoreWindow
 // ISwapChainPanel
 // IPropertySet
-// 
+//
 // Anything else will be rejected as an invalid IInspectable.
 bool IsValidEGLNativeWindowType(EGLNativeWindowType window)
 {
@@ -207,10 +210,10 @@ bool IsValidEGLNativeWindowType(EGLNativeWindowType window)
 }
 
 // Retrieve an optional property from a property set
-HRESULT GetOptionalPropertyValue(const ComPtr<ABI::Windows::Foundation::Collections::IMap<HSTRING, IInspectable*>>& propertyMap,
+HRESULT GetOptionalPropertyValue(const ComPtr<ABI::Windows::Foundation::Collections::IMap<HSTRING, IInspectable*>> &propertyMap,
                                  const wchar_t *propertyName,
                                  boolean *hasKey,
-                                 ComPtr<ABI::Windows::Foundation::IPropertyValue>& propertyValue)
+                                 ComPtr<ABI::Windows::Foundation::IPropertyValue> &propertyValue)
 {
     if (!propertyMap || !hasKey)
     {
@@ -237,7 +240,7 @@ HRESULT GetOptionalPropertyValue(const ComPtr<ABI::Windows::Foundation::Collecti
 }
 
 // Attempts to read an optional SIZE property value that is assumed to be in the form of
-// an ABI::Windows::Foundation::Size.  This function validates the Size value before returning 
+// an ABI::Windows::Foundation::Size.  This function validates the Size value before returning
 // it to the caller.
 //
 // Possible return values are:
@@ -248,7 +251,7 @@ HRESULT GetOptionalPropertyValue(const ComPtr<ABI::Windows::Foundation::Collecti
 //    * Invalid property value (width/height must be > 0)
 // Additional errors may be returned from IMap or IPropertyValue
 //
-HRESULT GetOptionalSizePropertyValue(const ComPtr<ABI::Windows::Foundation::Collections::IMap<HSTRING, IInspectable*>>& propertyMap,
+HRESULT GetOptionalSizePropertyValue(const ComPtr<ABI::Windows::Foundation::Collections::IMap<HSTRING, IInspectable*>> &propertyMap,
                                      const wchar_t *propertyName, SIZE *value, bool *valueExists)
 {
     ComPtr<ABI::Windows::Foundation::IPropertyValue> propertyValue;
@@ -297,7 +300,7 @@ HRESULT GetOptionalSizePropertyValue(const ComPtr<ABI::Windows::Foundation::Coll
 }
 
 // Attempts to read an optional float property value that is assumed to be in the form of
-// an ABI::Windows::Foundation::Single.  This function validates the Single value before returning 
+// an ABI::Windows::Foundation::Single.  This function validates the Single value before returning
 // it to the caller.
 //
 // Possible return values are:
@@ -308,7 +311,7 @@ HRESULT GetOptionalSizePropertyValue(const ComPtr<ABI::Windows::Foundation::Coll
 //    * Invalid property value (must be > 0)
 // Additional errors may be returned from IMap or IPropertyValue
 //
-HRESULT GetOptionalSinglePropertyValue(const ComPtr<ABI::Windows::Foundation::Collections::IMap<HSTRING, IInspectable*>>& propertyMap,
+HRESULT GetOptionalSinglePropertyValue(const ComPtr<ABI::Windows::Foundation::Collections::IMap<HSTRING, IInspectable*>> &propertyMap,
                                        const wchar_t *propertyName, float *value, bool *valueExists)
 {
     ComPtr<ABI::Windows::Foundation::IPropertyValue> propertyValue;

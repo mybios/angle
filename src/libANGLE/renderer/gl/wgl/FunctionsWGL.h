@@ -20,6 +20,10 @@ class FunctionsWGL : angle::NonCopyable
     // Loads all available wgl functions, may be called multiple times
     void initialize(HMODULE glModule, HDC context);
 
+    // Extension information
+    std::vector<std::string> extensions;
+    bool hasExtension(const std::string &ext) const;
+
     // Base WGL functions
     PFNWGLCOPYCONTEXTPROC copyContext;
     PFNWGLCREATECONTEXTPROC createContext;
@@ -42,11 +46,21 @@ class FunctionsWGL : angle::NonCopyable
     PFNWGLSWAPLAYERBUFFERSPROC swapLayerBuffers;
     PFNWGLSWAPMULTIPLEBUFFERSPROC swapMultipleBuffers;
 
-    // Extension functions, may be NULL
-    PFNWGLCREATECONTEXTATTRIBSARBPROC createContextAttribsARB;
-    PFNWGLGETPIXELFORMATATTRIBIVARBPROC getPixelFormatAttribivARB;
+    // WGL_EXT_extensions_string
     PFNWGLGETEXTENSIONSSTRINGEXTPROC getExtensionStringEXT;
+
+    // WGL_ARB_extensions_string
     PFNWGLGETEXTENSIONSSTRINGARBPROC getExtensionStringARB;
+
+    // WGL_ARB_create_context
+    PFNWGLCREATECONTEXTATTRIBSARBPROC createContextAttribsARB;
+
+    // WGL_ARB_pixel_format
+    PFNWGLGETPIXELFORMATATTRIBIVARBPROC getPixelFormatAttribivARB;
+    PFNWGLGETPIXELFORMATATTRIBFVARBPROC getPixelFormatAttribfvARB;
+    PFNWGLCHOOSEPIXELFORMATARBPROC choosePixelFormatARB;
+
+    // WGL_EXT_swap_control
     PFNWGLSWAPINTERVALEXTPROC swapIntervalEXT;
 
     // WGL_ARB_pbuffer

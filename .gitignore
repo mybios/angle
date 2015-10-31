@@ -9,10 +9,10 @@ Release_ARM/
 *.sdf
 *.ncb
 *.suo
-/src/tests/*.sln
-/src/tests/*.vcxproj
-/src/tests/*.vcxproj.filters
-/src/tests/*.vcxproj.user
+/**/src/tests/*.sln
+/**/src/tests/*.vcxproj
+/**/src/tests/*.vcxproj.filters
+/**/src/tests/*.vcxproj.user
 patches-*
 *.target.mk
 ipch
@@ -39,3 +39,10 @@ TestResults.qpa
 *.psess
 *.vsp
 *.nvuser
+buildtools/
+/winrt/**/build/
+/winrt/**/util/
+*.mdf
+*.ldf
+Generated Files/
+AppPackages/

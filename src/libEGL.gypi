@@ -9,7 +9,7 @@
     [
         {
             'target_name': 'libEGL',
-            'type': 'shared_library',
+            'type': '<(angle_gl_library_type)',
             'dependencies':
             [
                 'libANGLE',
@@ -32,9 +32,6 @@
             [
                 ['angle_build_winrt==1',
                 {
-                    'msvs_enable_winrt' : '1',
-                    'msvs_application_type_revision' : '<(angle_build_winrt_app_type_revision)',
-                    'msvs_target_platform_version' : '<(angle_build_winrt_target_platform_ver)',
                     'msvs_requires_importlibrary' : 'true',
                     'msvs_settings':
                     {
@@ -44,10 +41,6 @@
                             'OptimizeReferences': '1',
                         }
                     },
-                }],
-                ['angle_build_winphone==1',
-                {
-                    'msvs_enable_winphone' : '1',
                 }],
             ],
         },

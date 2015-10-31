@@ -84,12 +84,15 @@ Requirements
 =====
 
 Windows 10 Development:
-* [Visual Studio 2015 Community RC or higher](https://www.visualstudio.com/downloads/visual-studio-2015-downloads-vs.aspx)
+* [Visual Studio 2015 Community or higher](https://www.visualstudio.com/downloads/visual-studio-2015-downloads-vs.aspx)
 * Windows 10 for local Windows development
 
 Windows 8.1 and/or Windows Phone 8.1 Development:
 * Visual Studio Community 2013 (Update 4), or higher/later.
 * Windows 8.1 for local Windows development.
+
+Clasic Windows (Desktop) Development:
+* Visual Studio 2015 Community or higher.
 
 More Info
 =====
@@ -112,7 +115,7 @@ Quick Start (compiling from source)
 4. In Visual Studio go "File -> New -> Project", create a new ANGLE application, and hit F5 to run it!
 
 The Windows 10 Visual Studio solution for ANGLE is located here:
-* /winrt/10/windows/src/angle.sln
+* /winrt/10/src/angle.sln
 
 The Windows 8.1 Visual Studio solutions for ANGLE are located here:
 

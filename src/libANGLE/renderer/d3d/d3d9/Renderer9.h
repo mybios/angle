@@ -32,10 +32,12 @@ namespace rx
 {
 class Blit9;
 class IndexDataManager;
+class ProgramD3D;
 class StreamingIndexBufferInterface;
 class StaticIndexBufferInterface;
 class VertexDataManager;
 struct ClearParameters;
+struct D3DUniform;
 struct TranslatedAttribute;
 
 enum D3D9InitError
@@ -68,6 +70,7 @@ class Renderer9 : public RendererD3D
     virtual bool resetDevice();
 
     egl::ConfigSet generateConfigs() const override;
+    void generateDisplayExtensions(egl::DisplayExtensions *outExtensions) const override;
 
     void startScene();
     void endScene();
@@ -106,19 +109,17 @@ class Renderer9 : public RendererD3D
     gl::Error applyRenderTarget(const gl::Framebuffer *frameBuffer) override;
     gl::Error applyRenderTarget(const gl::FramebufferAttachment *colorAttachment,
                                 const gl::FramebufferAttachment *depthStencilAttachment);
-    virtual gl::Error applyShaders(gl::Program *program, const gl::VertexFormat inputLayout[], const gl::Framebuffer *framebuffer,
-                                   bool rasterizerDiscard, bool transformFeedbackActive);
-    virtual gl::Error applyUniforms(const ProgramImpl &program, const std::vector<gl::LinkedUniform*> &uniformArray);
+    gl::Error applyShaders(gl::Program *program,
+                           const gl::Framebuffer *framebuffer,
+                           bool rasterizerDiscard,
+                           bool transformFeedbackActive) override;
+    gl::Error applyUniforms(const ProgramD3D &programD3D,
+                            const std::vector<D3DUniform *> &uniformArray) override;
     virtual bool applyPrimitiveType(GLenum primitiveType, GLsizei elementCount, bool usesPointSize);
     virtual gl::Error applyVertexBuffer(const gl::State &state, GLenum mode, GLint first, GLsizei count, GLsizei instances, SourceIndexData *sourceInfo);
     virtual gl::Error applyIndexBuffer(const GLvoid *indices, gl::Buffer *elementArrayBuffer, GLsizei count, GLenum mode, GLenum type, TranslatedIndexData *indexInfo, SourceIndexData *sourceIndexInfo);
 
     void applyTransformFeedbackBuffers(const gl::State &state) override;
-
-    gl::Error drawArrays(const gl::Data &data, GLenum mode, GLsizei count, GLsizei instances, bool usesPointSize) override;
-    virtual gl::Error drawElements(GLenum mode, GLsizei count, GLenum type, const GLvoid *indices,
-                                   gl::Buffer *elementArrayBuffer, const TranslatedIndexData &indexInfo, GLsizei instances,
-                                   bool usesPointSize);
 
     gl::Error clear(const ClearParameters &clearParams,
                     const gl::FramebufferAttachment *colorBuffer,
@@ -141,8 +142,8 @@ class Renderer9 : public RendererD3D
     virtual unsigned int getReservedFragmentUniformVectors() const;
     virtual unsigned int getReservedVertexUniformBuffers() const;
     virtual unsigned int getReservedFragmentUniformBuffers() const;
-    virtual bool getShareHandleSupport() const;
-    virtual bool getPostSubBufferSupport() const;
+
+    bool getShareHandleSupport() const;
 
     virtual int getMajorShaderModel() const;
     int getMinorShaderModel() const override;
@@ -165,15 +166,14 @@ class Renderer9 : public RendererD3D
 
     // RenderTarget creation
     virtual gl::Error createRenderTarget(int width, int height, GLenum format, GLsizei samples, RenderTargetD3D **outRT);
+    gl::Error createRenderTargetCopy(RenderTargetD3D *source, RenderTargetD3D **outRT) override;
 
     // Framebuffer creation
-    FramebufferImpl *createDefaultFramebuffer(const gl::Framebuffer::Data &data) override;
     FramebufferImpl *createFramebuffer(const gl::Framebuffer::Data &data) override;
 
     // Shader creation
-    virtual CompilerImpl *createCompiler(const gl::Data &data);
-    virtual ShaderImpl *createShader(GLenum type);
-    virtual ProgramImpl *createProgram();
+    ShaderImpl *createShader(const gl::Shader::Data &data) override;
+    ProgramImpl *createProgram(const gl::Program::Data &data) override;
 
     // Shader operations
     virtual gl::Error loadExecutable(const void *function, size_t length, ShaderType type,
@@ -188,8 +188,10 @@ class Renderer9 : public RendererD3D
     // Image operations
     virtual ImageD3D *createImage();
     gl::Error generateMipmap(ImageD3D *dest, ImageD3D *source) override;
-    gl::Error generateMipmapsUsingD3D(TextureStorage *storage, const gl::SamplerState &samplerState) override;
+    gl::Error generateMipmapsUsingD3D(TextureStorage *storage,
+                                      const gl::TextureState &textureState) override;
     virtual TextureStorage *createTextureStorage2D(SwapChainD3D *swapChain);
+    TextureStorage *createTextureStorageEGLImage(EGLImageD3D *eglImage) override;
     virtual TextureStorage *createTextureStorage2D(GLenum internalformat, bool renderTarget, GLsizei width, GLsizei height, int levels, bool hintLevelZeroOnly);
     virtual TextureStorage *createTextureStorageCube(GLenum internalformat, bool renderTarget, int size, int levels, bool hintLevelZeroOnly);
     virtual TextureStorage *createTextureStorage3D(GLenum internalformat, bool renderTarget, GLsizei width, GLsizei height, GLsizei depth, int levels);
@@ -207,7 +209,7 @@ class Renderer9 : public RendererD3D
     virtual IndexBuffer *createIndexBuffer();
 
     // Vertex Array creation
-    virtual VertexArrayImpl *createVertexArray();
+    VertexArrayImpl *createVertexArray(const gl::VertexArray::Data &data) override;
 
     // Query and Fence creation
     virtual QueryImpl *createQuery(GLenum type);
@@ -228,8 +230,8 @@ class Renderer9 : public RendererD3D
     D3DPOOL getTexturePool(DWORD usage) const;
 
     bool getLUID(LUID *adapterLuid) const override;
-    virtual VertexConversionType getVertexConversionType(const gl::VertexFormat &vertexFormat) const;
-    virtual GLenum getVertexComponentType(const gl::VertexFormat &vertexFormat) const;
+    VertexConversionType getVertexConversionType(gl::VertexFormatType vertexFormatType) const override;
+    GLenum getVertexComponentType(gl::VertexFormatType vertexFormatType) const override;
 
     gl::Error copyToRenderTarget(IDirect3DSurface9 *dest, IDirect3DSurface9 *source, bool fromManaged);
 
@@ -237,24 +239,36 @@ class Renderer9 : public RendererD3D
 
     D3DDEVTYPE getD3D9DeviceType() const { return mDeviceType; }
 
-    bool usesAlternateRenderableFormat(GLenum internalFormat) override;
-
   protected:
     void createAnnotator() override;
     gl::Error clearTextures(gl::SamplerType samplerType, size_t rangeStart, size_t rangeEnd) override;
 
   private:
+    gl::Error drawArraysImpl(const gl::Data &data,
+                             GLenum mode,
+                             GLsizei count,
+                             GLsizei instances,
+                             bool usesPointSize) override;
+    gl::Error drawElementsImpl(GLenum mode,
+                               GLsizei count,
+                               GLenum type,
+                               const GLvoid *indices,
+                               gl::Buffer *elementArrayBuffer,
+                               const TranslatedIndexData &indexInfo,
+                               GLsizei instances,
+                               bool usesPointSize) override;
+
     void generateCaps(gl::Caps *outCaps, gl::TextureCapsMap *outTextureCaps,
                       gl::Extensions *outExtensions,
                       gl::Limitations *outLimitations) const override;
 
-    Workarounds generateWorkarounds() const override;
+    WorkaroundsD3D generateWorkarounds() const override;
 
     void release();
 
-    void applyUniformnfv(gl::LinkedUniform *targetUniform, const GLfloat *v);
-    void applyUniformniv(gl::LinkedUniform *targetUniform, const GLint *v);
-    void applyUniformnbv(gl::LinkedUniform *targetUniform, const GLint *v);
+    void applyUniformnfv(const D3DUniform *targetUniform, const GLfloat *v);
+    void applyUniformniv(const D3DUniform *targetUniform, const GLint *v);
+    void applyUniformnbv(const D3DUniform *targetUniform, const GLint *v);
 
     gl::Error drawLineLoop(GLsizei count, GLenum type, const GLvoid *indices, int minIndex, gl::Buffer *elementArrayBuffer);
     gl::Error drawIndexedPoints(GLsizei count, GLenum type, const GLvoid *indices, int minIndex, gl::Buffer *elementArrayBuffer);
@@ -343,11 +357,16 @@ class Renderer9 : public RendererD3D
     GLuint mCurSampleMask;
 
     // Currently applied sampler states
-    std::vector<bool> mForceSetVertexSamplerStates;
-    std::vector<gl::SamplerState> mCurVertexSamplerStates;
+    struct CurSamplerState
+    {
+        CurSamplerState();
 
-    std::vector<bool> mForceSetPixelSamplerStates;
-    std::vector<gl::SamplerState> mCurPixelSamplerStates;
+        bool forceSet;
+        size_t baseLevel;
+        gl::SamplerState samplerState;
+    };
+    std::vector<CurSamplerState> mCurVertexSamplerStates;
+    std::vector<CurSamplerState> mCurPixelSamplerStates;
 
     // Currently applied textures
     std::vector<uintptr_t> mCurVertexTextures;

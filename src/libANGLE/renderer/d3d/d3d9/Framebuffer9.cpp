@@ -22,7 +22,7 @@ namespace rx
 {
 
 Framebuffer9::Framebuffer9(const gl::Framebuffer::Data &data, Renderer9 *renderer)
-    : FramebufferD3D(data, renderer),
+    : FramebufferD3D(data),
       mRenderer(renderer)
 {
     ASSERT(mRenderer != nullptr);
@@ -73,7 +73,12 @@ gl::Error Framebuffer9::clear(const gl::State &state, const ClearParameters &cle
     return mRenderer->clear(clearParams, colorAttachment, depthStencilAttachment);
 }
 
-gl::Error Framebuffer9::readPixels(const gl::Rectangle &area, GLenum format, GLenum type, size_t outputPitch, const gl::PixelPackState &pack, uint8_t *pixels) const
+gl::Error Framebuffer9::readPixelsImpl(const gl::Rectangle &area,
+                                       GLenum format,
+                                       GLenum type,
+                                       size_t outputPitch,
+                                       const gl::PixelPackState &pack,
+                                       uint8_t *pixels) const
 {
     ASSERT(pack.pixelBuffer.get() == nullptr);
 

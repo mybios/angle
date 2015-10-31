@@ -13,11 +13,11 @@
 #include "libANGLE/formatutils.h"
 #include "libANGLE/Framebuffer.h"
 #include "libANGLE/FramebufferAttachment.h"
-#include "libANGLE/renderer/d3d/loadimage.h"
 #include "libANGLE/renderer/d3d/d3d11/formatutils11.h"
 #include "libANGLE/renderer/d3d/d3d11/Renderer11.h"
 #include "libANGLE/renderer/d3d/d3d11/renderer11_utils.h"
 #include "libANGLE/renderer/d3d/d3d11/RenderTarget11.h"
+#include "libANGLE/renderer/d3d/d3d11/texture_format_table.h"
 #include "libANGLE/renderer/d3d/d3d11/TextureStorage11.h"
 
 namespace rx
@@ -26,13 +26,12 @@ namespace rx
 Image11::Image11(Renderer11 *renderer)
     : mRenderer(renderer),
       mDXGIFormat(DXGI_FORMAT_UNKNOWN),
-      mStagingTexture(nullptr),
+      mStagingTexture(NULL),
       mStagingSubresource(0),
       mRecoverFromStorage(false),
-      mAssociatedStorage(nullptr),
+      mAssociatedStorage(NULL),
       mAssociatedImageIndex(gl::ImageIndex::MakeInvalid()),
-      mRecoveredFromStorageCount(0),
-      mUsesAlternateRenderableFormat(false)
+      mRecoveredFromStorageCount(0)
 {
 }
 
@@ -49,7 +48,7 @@ gl::Error Image11::generateMipmap(Image11 *dest, Image11 *src)
     ASSERT(src->getHeight() == 1 || src->getHeight() / 2 == dest->getHeight());
 
     const d3d11::DXGIFormat &dxgiFormatInfo = d3d11::GetDXGIFormatInfo(src->getDXGIFormat());
-    ASSERT(dxgiFormatInfo.mipGenerationFunction != nullptr);
+    ASSERT(dxgiFormatInfo.mipGenerationFunction != NULL);
 
     D3D11_MAPPED_SUBRESOURCE destMapped;
     gl::Error error = dest->map(D3D11_MAP_WRITE, &destMapped);
@@ -90,7 +89,7 @@ bool Image11::isDirty() const
     if (mDirty && !mStagingTexture && !mRecoverFromStorage)
     {
         const Renderer11DeviceCaps &deviceCaps = mRenderer->getRenderer11DeviceCaps();
-        const d3d11::TextureFormat &formatInfo = d3d11::GetTextureFormatInfo(mInternalFormat, deviceCaps, false);
+        const d3d11::TextureFormat formatInfo = d3d11::GetTextureFormatInfo(mInternalFormat, deviceCaps);
         if (formatInfo.dataInitializerFunction == nullptr)
         {
             return false;
@@ -120,7 +119,7 @@ gl::Error Image11::copyToStorage(TextureStorage *storage, const gl::ImageIndex &
         }
     }
 
-    ID3D11Resource *stagingTexture = nullptr;
+    ID3D11Resource *stagingTexture = NULL;
     unsigned int stagingSubresourceIndex = 0;
     gl::Error error = getStagingTexture(&stagingTexture, &stagingSubresourceIndex);
     if (error.isError())
@@ -128,17 +127,7 @@ gl::Error Image11::copyToStorage(TextureStorage *storage, const gl::ImageIndex &
         return error;
     }
 
-    if (storage11->isRenderTarget() && mUsesAlternateRenderableFormat)
-    {
-        // This means that the texture storage and the staging texture use different formats
-        // We must copy and convert the staging texture's data using a temporary texture
-        error = copyAndConvertViaTemporaryTexture(stagingTexture, storage11, stagingSubresourceIndex, index, region, true);
-    }
-    else
-    {
-        error = storage11->updateSubresourceLevel(stagingTexture, stagingSubresourceIndex, index, region);
-    }
-
+    error = storage11->updateSubresourceLevel(stagingTexture, stagingSubresourceIndex, index, region);
     if (error.isError())
     {
         return error;
@@ -174,32 +163,19 @@ gl::Error Image11::recoverFromAssociatedStorage()
 
         bool textureStorageCorrect = mAssociatedStorage->isAssociatedImageValid(mAssociatedImageIndex, this);
 
-        // This means that the cached TextureStorage has been modified after this Image11 released its copy of its data.
+        // This means that the cached TextureStorage has been modified after this Image11 released its copy of its data. 
         // This should not have happened. The TextureStorage should have told this Image11 to recover its data before it was overwritten.
         ASSERT(textureStorageCorrect);
 
         if (textureStorageCorrect)
         {
+            // CopySubResource from the Storage to the Staging texture
             gl::Box region(0, 0, 0, mWidth, mHeight, mDepth);
-
-            if (mAssociatedStorage->isRenderTarget() && mUsesAlternateRenderableFormat)
-            {
-                // This means that the texture storage and the staging texture use different formats
-                // We must copy and convert the texture storage's data using a temporary texture
-                error = copyAndConvertViaTemporaryTexture(mStagingTexture, mAssociatedStorage, mStagingSubresource, mAssociatedImageIndex, region, false);
-            }
-            else
-            {
-                // CopySubResource from the Storage to the Staging texture
-                error = mAssociatedStorage->copySubresourceLevel(mStagingTexture, mStagingSubresource, mAssociatedImageIndex, region);
-            }
-
+            error = mAssociatedStorage->copySubresourceLevel(mStagingTexture, mStagingSubresource, mAssociatedImageIndex, region);
             if (error.isError())
             {
                 return error;
             }
-
-            mDirty = true;
 
             mRecoveredFromStorageCount += 1;
         }
@@ -219,7 +195,7 @@ void Image11::disassociateStorage()
         mAssociatedStorage->disassociateImage(mAssociatedImageIndex, this);
 
         mRecoverFromStorage = false;
-        mAssociatedStorage = nullptr;
+        mAssociatedStorage = NULL;
         mAssociatedImageIndex = gl::ImageIndex::MakeInvalid();
     }
 }
@@ -243,14 +219,12 @@ bool Image11::redefine(GLenum target, GLenum internalformat, const gl::Extents &
         mTarget = target;
 
         // compute the d3d format that will be used
-        const d3d11::TextureFormat &formatInfo = d3d11::GetTextureFormatInfo(internalformat, mRenderer->getRenderer11DeviceCaps(), false);
-        const d3d11::TextureFormat &renderableFormatInfo = d3d11::GetTextureFormatInfo(internalformat, mRenderer->getRenderer11DeviceCaps(), true);
+        const d3d11::TextureFormat &formatInfo = d3d11::GetTextureFormatInfo(internalformat, mRenderer->getRenderer11DeviceCaps());
         mDXGIFormat = formatInfo.texFormat;
-        mRenderable = (renderableFormatInfo.rtvFormat != DXGI_FORMAT_UNKNOWN);
-        mUsesAlternateRenderableFormat = (formatInfo.texFormat != renderableFormatInfo.texFormat);
+        mRenderable = (formatInfo.rtvFormat != DXGI_FORMAT_UNKNOWN);
 
         releaseStagingTexture();
-        mDirty = (formatInfo.dataInitializerFunction != nullptr);
+        mDirty = (formatInfo.dataInitializerFunction != NULL);
 
         return true;
     }
@@ -273,12 +247,15 @@ gl::Error Image11::loadData(const gl::Box &area, const gl::PixelUnpackState &unp
 {
     const gl::InternalFormat &formatInfo = gl::GetInternalFormatInfo(mInternalFormat);
     GLsizei inputRowPitch = formatInfo.computeRowPitch(type, area.width, unpack.alignment, unpack.rowLength);
-    GLsizei inputDepthPitch = formatInfo.computeDepthPitch(type, area.width, area.height, unpack.alignment, unpack.rowLength);
+    GLsizei inputDepthPitch = formatInfo.computeDepthPitch(
+        type, area.width, area.height, unpack.alignment, unpack.rowLength, unpack.imageHeight);
+    GLsizei inputSkipBytes = formatInfo.computeSkipPixels(
+        inputRowPitch, inputDepthPitch, unpack.skipImages, unpack.skipRows, unpack.skipPixels);
 
     const d3d11::DXGIFormat &dxgiFormatInfo = d3d11::GetDXGIFormatInfo(mDXGIFormat);
     GLuint outputPixelSize = dxgiFormatInfo.pixelBytes;
 
-    const d3d11::TextureFormat &d3dFormatInfo = d3d11::GetTextureFormatInfo(mInternalFormat, mRenderer->getRenderer11DeviceCaps(), false);
+    const d3d11::TextureFormat &d3dFormatInfo = d3d11::GetTextureFormatInfo(mInternalFormat, mRenderer->getRenderer11DeviceCaps());
     LoadImageFunction loadFunction = d3dFormatInfo.loadFunctions.at(type);
 
     D3D11_MAPPED_SUBRESOURCE mappedImage;
@@ -290,8 +267,8 @@ gl::Error Image11::loadData(const gl::Box &area, const gl::PixelUnpackState &unp
 
     uint8_t *offsetMappedData = (reinterpret_cast<uint8_t*>(mappedImage.pData) + (area.y * mappedImage.RowPitch + area.x * outputPixelSize + area.z * mappedImage.DepthPitch));
     loadFunction(area.width, area.height, area.depth,
-                 reinterpret_cast<const uint8_t*>(input), inputRowPitch, inputDepthPitch,
-                 offsetMappedData, mappedImage.RowPitch, mappedImage.DepthPitch);
+                 reinterpret_cast<const uint8_t *>(input) + inputSkipBytes, inputRowPitch,
+                 inputDepthPitch, offsetMappedData, mappedImage.RowPitch, mappedImage.DepthPitch);
 
     unmap();
 
@@ -302,7 +279,8 @@ gl::Error Image11::loadCompressedData(const gl::Box &area, const void *input)
 {
     const gl::InternalFormat &formatInfo = gl::GetInternalFormatInfo(mInternalFormat);
     GLsizei inputRowPitch = formatInfo.computeRowPitch(GL_UNSIGNED_BYTE, area.width, 1, 0);
-    GLsizei inputDepthPitch = formatInfo.computeDepthPitch(GL_UNSIGNED_BYTE, area.width, area.height, 1, 0);
+    GLsizei inputDepthPitch =
+        formatInfo.computeDepthPitch(GL_UNSIGNED_BYTE, area.width, area.height, 1, 0, 0);
 
     const d3d11::DXGIFormat &dxgiFormatInfo = d3d11::GetDXGIFormatInfo(mDXGIFormat);
     GLuint outputPixelSize = dxgiFormatInfo.pixelBytes;
@@ -312,7 +290,7 @@ gl::Error Image11::loadCompressedData(const gl::Box &area, const void *input)
     ASSERT(area.x % outputBlockWidth == 0);
     ASSERT(area.y % outputBlockHeight == 0);
 
-    const d3d11::TextureFormat &d3dFormatInfo = d3d11::GetTextureFormatInfo(mInternalFormat, mRenderer->getRenderer11DeviceCaps(), false);
+    const d3d11::TextureFormat &d3dFormatInfo = d3d11::GetTextureFormatInfo(mInternalFormat, mRenderer->getRenderer11DeviceCaps());
     LoadImageFunction loadFunction = d3dFormatInfo.loadFunctions.at(GL_UNSIGNED_BYTE);
 
     D3D11_MAPPED_SUBRESOURCE mappedImage;
@@ -356,7 +334,7 @@ gl::Error Image11::copy(const gl::Offset &destOffset, const gl::Box &sourceArea,
     TextureStorage11 *sourceStorage11 = GetAs<TextureStorage11>(source);
 
     UINT subresourceIndex = sourceStorage11->getSubresourceIndex(sourceIndex);
-    ID3D11Resource *resource = nullptr;
+    ID3D11Resource *resource = NULL;
     gl::Error error = sourceStorage11->getResource(&resource);
     if (error.isError())
     {
@@ -379,7 +357,7 @@ gl::Error Image11::copy(const gl::Offset &destOffset, const gl::Box &sourceArea,
     gl::Extents extents;
     UINT sampleCount = 0;
 
-    ID3D11Texture2D *source2D = nullptr;
+    ID3D11Texture2D *source2D = NULL;
 
     if (dim == D3D11_RESOURCE_DIMENSION_TEXTURE2D)
     {
@@ -411,7 +389,7 @@ gl::Error Image11::copy(const gl::Offset &destOffset, const gl::Box &sourceArea,
     if (format == mDXGIFormat)
     {
         // No conversion needed-- use copyback fastpath
-        ID3D11Resource *stagingTexture = nullptr;
+        ID3D11Resource *stagingTexture = NULL;
         unsigned int stagingSubresourceIndex = 0;
         gl::Error error = getStagingTexture(&stagingTexture, &stagingSubresourceIndex);
         if (error.isError())
@@ -424,7 +402,7 @@ gl::Error Image11::copy(const gl::Offset &destOffset, const gl::Box &sourceArea,
 
         UINT subresourceAfterResolve = sourceSubResource;
 
-        ID3D11Resource *srcTex = nullptr;
+        ID3D11Resource *srcTex = NULL;
 
         bool needResolve = (dim == D3D11_RESOURCE_DIMENSION_TEXTURE2D && sampleCount > 1);
 
@@ -443,8 +421,8 @@ gl::Error Image11::copy(const gl::Offset &destOffset, const gl::Box &sourceArea,
             resolveDesc.CPUAccessFlags = 0;
             resolveDesc.MiscFlags = 0;
 
-            ID3D11Texture2D *srcTex2D = nullptr;
-            HRESULT result = device->CreateTexture2D(&resolveDesc, nullptr, &srcTex2D);
+            ID3D11Texture2D *srcTex2D = NULL;
+            HRESULT result = device->CreateTexture2D(&resolveDesc, NULL, &srcTex2D);
             if (FAILED(result))
             {
                 return gl::Error(GL_OUT_OF_MEMORY, "Failed to create resolve texture for Image11::copy, HRESULT: 0x%X.", result);
@@ -553,7 +531,7 @@ gl::Error Image11::createStagingTexture()
 
     if (mTarget == GL_TEXTURE_3D)
     {
-        ID3D11Texture3D *newTexture = nullptr;
+        ID3D11Texture3D *newTexture = NULL;
 
         D3D11_TEXTURE3D_DESC desc;
         desc.Width = width;
@@ -566,7 +544,7 @@ gl::Error Image11::createStagingTexture()
         desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ | D3D11_CPU_ACCESS_WRITE;
         desc.MiscFlags = 0;
 
-        if (d3d11::GetTextureFormatInfo(mInternalFormat, mRenderer->getRenderer11DeviceCaps(), false).dataInitializerFunction != nullptr)
+        if (d3d11::GetTextureFormatInfo(mInternalFormat, mRenderer->getRenderer11DeviceCaps()).dataInitializerFunction != NULL)
         {
             std::vector<D3D11_SUBRESOURCE_DATA> initialData;
             std::vector< std::vector<BYTE> > textureData;
@@ -577,7 +555,7 @@ gl::Error Image11::createStagingTexture()
         }
         else
         {
-            result = device->CreateTexture3D(&desc, nullptr, &newTexture);
+            result = device->CreateTexture3D(&desc, NULL, &newTexture);
         }
 
         if (FAILED(result))
@@ -591,7 +569,7 @@ gl::Error Image11::createStagingTexture()
     }
     else if (mTarget == GL_TEXTURE_2D || mTarget == GL_TEXTURE_2D_ARRAY || mTarget == GL_TEXTURE_CUBE_MAP)
     {
-        ID3D11Texture2D *newTexture = nullptr;
+        ID3D11Texture2D *newTexture = NULL;
 
         D3D11_TEXTURE2D_DESC desc;
         desc.Width = width;
@@ -606,7 +584,7 @@ gl::Error Image11::createStagingTexture()
         desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ | D3D11_CPU_ACCESS_WRITE;
         desc.MiscFlags = 0;
 
-        if (d3d11::GetTextureFormatInfo(mInternalFormat, mRenderer->getRenderer11DeviceCaps(), false).dataInitializerFunction != nullptr)
+        if (d3d11::GetTextureFormatInfo(mInternalFormat, mRenderer->getRenderer11DeviceCaps()).dataInitializerFunction != NULL)
         {
             std::vector<D3D11_SUBRESOURCE_DATA> initialData;
             std::vector< std::vector<BYTE> > textureData;
@@ -617,7 +595,7 @@ gl::Error Image11::createStagingTexture()
         }
         else
         {
-            result = device->CreateTexture2D(&desc, nullptr, &newTexture);
+            result = device->CreateTexture2D(&desc, NULL, &newTexture);
         }
 
         if (FAILED(result))
@@ -647,7 +625,7 @@ gl::Error Image11::map(D3D11_MAP mapType, D3D11_MAPPED_SUBRESOURCE *map)
         return error;
     }
 
-    ID3D11Resource *stagingTexture = nullptr;
+    ID3D11Resource *stagingTexture = NULL;
     unsigned int subresourceIndex = 0;
     error = getStagingTexture(&stagingTexture, &subresourceIndex);
     if (error.isError())
@@ -660,13 +638,13 @@ gl::Error Image11::map(D3D11_MAP mapType, D3D11_MAPPED_SUBRESOURCE *map)
     ASSERT(mStagingTexture);
     HRESULT result = deviceContext->Map(stagingTexture, subresourceIndex, mapType, 0, map);
 
-    // this can fail if the device is removed (from TDR)
-    if (d3d11::isDeviceLostError(result))
+    if (FAILED(result))
     {
-        mRenderer->notifyDeviceLost();
-    }
-    else if (FAILED(result))
-    {
+        // this can fail if the device is removed (from TDR)
+        if (d3d11::isDeviceLostError(result))
+        {
+            mRenderer->notifyDeviceLost();
+        }
         return gl::Error(GL_OUT_OF_MEMORY, "Failed to map staging texture, result: 0x%X.", result);
     }
 
@@ -682,172 +660,6 @@ void Image11::unmap()
         ID3D11DeviceContext *deviceContext = mRenderer->getDeviceContext();
         deviceContext->Unmap(mStagingTexture, mStagingSubresource);
     }
-}
-
-gl::Error Image11::copyAndConvertTexture(ID3D11Resource *input, DXGI_FORMAT inputFormat,
-                                         ID3D11Resource *output, DXGI_FORMAT outputFormat,
-                                         unsigned int subresourceIndex, size_t width, size_t height, size_t depth)
-{
-    ASSERT(input);
-    ASSERT(output);
-
-    D3D11_MAPPED_SUBRESOURCE inputMap;
-    D3D11_MAPPED_SUBRESOURCE outputMap;
-    HRESULT hr = S_OK;
-
-    LoadImageFunction loadFunction = nullptr;
-    ID3D11DeviceContext *deviceContext = mRenderer->getDeviceContext();
-
-    if (inputFormat == DXGI_FORMAT_B4G4R4A4_UNORM && outputFormat == DXGI_FORMAT_R8G8B8A8_UNORM)
-    {
-        loadFunction = LoadARGB4ToRGBA8;
-    }
-    else if (inputFormat == DXGI_FORMAT_R8G8B8A8_UNORM && outputFormat == DXGI_FORMAT_B4G4R4A4_UNORM)
-    {
-        loadFunction = LoadRGBA8toARGB4;
-    }
-    else
-    {
-        // If we want to support conversion between more DXGI formats, then we should
-        // add a proper map between DXGI formats instead of hardcoding these functions
-        UNREACHABLE();
-    }
-
-    hr = deviceContext->Map(input, subresourceIndex, D3D11_MAP_WRITE, 0, &inputMap);
-    if (FAILED(hr))
-    {
-        return gl::Error(GL_OUT_OF_MEMORY, "Failed to map inputted texture, result: 0x%X.", hr);
-    }
-
-    hr = deviceContext->Map(output, subresourceIndex, D3D11_MAP_WRITE, 0, &outputMap);
-    if (FAILED(hr))
-    {
-        deviceContext->Unmap(input, subresourceIndex);
-        return gl::Error(GL_OUT_OF_MEMORY, "Failed to map output texture, result: 0x%X.", hr);
-    }
-
-    loadFunction(width, height, depth,
-                 reinterpret_cast<const uint8_t*>(inputMap.pData), inputMap.RowPitch, inputMap.DepthPitch,
-                 reinterpret_cast<uint8_t*>(outputMap.pData), outputMap.RowPitch, outputMap.DepthPitch);
-
-    deviceContext->Unmap(input, subresourceIndex);
-    deviceContext->Unmap(output, subresourceIndex);
-
-    return gl::Error(GL_NO_ERROR);
-}
-
-gl::Error Image11::createTemporaryRenderableFormatImage2D(DXGI_FORMAT format, ID3D11Texture2D **output)
-{
-    ID3D11Texture2D *staging2D = d3d11::DynamicCastComObject<ID3D11Texture2D>(mStagingTexture);
-    ASSERT(staging2D != nullptr);
-
-    // Create a new texture with the same parameters, except in the renderable texture format
-    D3D11_TEXTURE2D_DESC tex2Ddesc;
-    staging2D->GetDesc(&tex2Ddesc);
-    tex2Ddesc.Format = format;
-
-    HRESULT hr = mRenderer->getDevice()->CreateTexture2D(&tex2Ddesc, nullptr, output);
-    if (FAILED(hr))
-    {
-        return gl::Error(GL_OUT_OF_MEMORY, "Failed to create temporary Image2D in the renderable format, result: 0x%X.", hr);
-    }
-
-    return gl::Error(GL_NO_ERROR);
-}
-
-gl::Error Image11::createTemporaryRenderableFormatImage3D(DXGI_FORMAT format, ID3D11Texture3D **output)
-{
-    ID3D11Texture3D *staging3D = d3d11::DynamicCastComObject<ID3D11Texture3D>(mStagingTexture);
-    ASSERT(staging3D != nullptr);
-
-    // Create a new texture with the same parameters, except in the renderable texture format
-    D3D11_TEXTURE3D_DESC tex3Ddesc;
-    staging3D->GetDesc(&tex3Ddesc);
-    tex3Ddesc.Format = format;
-
-    HRESULT hr = mRenderer->getDevice()->CreateTexture3D(&tex3Ddesc, nullptr, output);
-    if (FAILED(hr))
-    {
-        return gl::Error(GL_OUT_OF_MEMORY, "Failed to create temporary Image3D in the renderable format, result: 0x%X.", hr);
-    }
-
-    return gl::Error(GL_NO_ERROR);
-}
-
-gl::Error Image11::copyAndConvertViaTemporaryTexture(ID3D11Resource *stagingTexture, TextureStorage11 *storage11,
-                                                     unsigned int stagingSubresourceIndex,
-                                                     const gl::ImageIndex &index, const gl::Box &region,
-                                                     bool intoStorage)
-{
-    // This method does the following:
-    //  - Creates a temporary 1-level texture in the renderable texture format
-    //  - If 'intoStorage' is true then:
-    //        - Copies and convert stagingTexture into this temporary texture
-    //        - Copies the temporary texture's data into the storage
-    //  - Otherwise, if 'intoStorage' is false then:
-    //        - Copy the texture storage's data into this temporary texture
-    //        - Copy and convert the temporary texture's data back into stagingTexture
-    //  - Deletes the temporary texture
-
-    const d3d11::TextureFormat &d3dRenderableFormatInfo = d3d11::GetTextureFormatInfo(mInternalFormat, mRenderer->getRenderer11DeviceCaps(), true);
-    gl::Error error(GL_NO_ERROR);
-
-    ID3D11Resource *tempRenderableFormatTexture = nullptr;
-
-    D3D11_RESOURCE_DIMENSION dim;
-    stagingTexture->GetType(&dim);
-    if (dim == D3D11_RESOURCE_DIMENSION_TEXTURE2D)
-    {
-        ID3D11Texture2D *tex2d = nullptr;
-        createTemporaryRenderableFormatImage2D(d3dRenderableFormatInfo.texFormat, &tex2d);
-        tempRenderableFormatTexture = d3d11::DynamicCastComObject<ID3D11Resource>(tex2d);
-    }
-    else if (dim == D3D11_RESOURCE_DIMENSION_TEXTURE3D)
-    {
-        ID3D11Texture3D *tex3d = nullptr;
-        createTemporaryRenderableFormatImage3D(d3dRenderableFormatInfo.texFormat, &tex3d);
-        tempRenderableFormatTexture = d3d11::DynamicCastComObject<ID3D11Resource>(tex3d);
-    }
-    else
-    {
-        UNREACHABLE();
-        return gl::Error(GL_INVALID_OPERATION, "Invalid texture type detected");
-    }
-
-    if (intoStorage)
-    {
-        // First copy this image's staging texture into the temporary texture
-        // Then we copy the temporary texture into the storage
-        copyAndConvertTexture(stagingTexture, mDXGIFormat, tempRenderableFormatTexture, d3dRenderableFormatInfo.texFormat, stagingSubresourceIndex, mWidth, mHeight, mDepth);
-        if (error.isError())
-        {
-            SafeRelease(tempRenderableFormatTexture);
-            return error;
-        }
-
-        error = storage11->updateSubresourceLevel(tempRenderableFormatTexture, stagingSubresourceIndex, index, region);
-    }
-    else
-    {
-        // Copy the texture storage's data into the temporary texture
-        // Then copy the temporary texture's data into the actual image
-        error = mAssociatedStorage->copySubresourceLevel(tempRenderableFormatTexture, mStagingSubresource, mAssociatedImageIndex, region);
-        if (error.isError())
-        {
-            SafeRelease(tempRenderableFormatTexture);
-            return error;
-        }
-
-        error = copyAndConvertTexture(tempRenderableFormatTexture, d3dRenderableFormatInfo.texFormat, mStagingTexture, mDXGIFormat, mStagingSubresource, mWidth, mHeight, mDepth);
-    }
-
-    SafeRelease(tempRenderableFormatTexture);
-    if (error.isError())
-    {
-        return error;
-    }
-
-    return error;
 }
 
 }

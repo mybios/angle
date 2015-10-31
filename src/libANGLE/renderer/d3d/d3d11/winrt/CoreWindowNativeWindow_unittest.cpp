@@ -255,8 +255,7 @@ TEST(NativeWindowTest, NativeWindowMissingCoreWindowInPropertySet)
 }
 
 // Tests that the scale property works as expected in a property set with a SwapChainPanel
-class CoreWindowScaleTest : public testing::Test,
-                            public testing::WithParamInterface<std::pair<float, bool>>
+class CoreWindowScaleTest : public testing::TestWithParam<std::pair<float, bool>>
 {
 };
 
@@ -299,16 +298,14 @@ static const scaleValidPair scales[] = { scaleValidPair(1.0f,   true),
                                          scaleValidPair(0.5f,   true),
                                          scaleValidPair(0.0f,   false),
                                          scaleValidPair(0.01f,  true),
-                                         scaleValidPair(1.49f,  true),
-                                         scaleValidPair(1.51f,  false) };
+                                         scaleValidPair(2.00f,  true) };
 
 INSTANTIATE_TEST_CASE_P(NativeWindowTest,
                         CoreWindowScaleTest,
                         testing::ValuesIn(scales));
 
 // Tests that the size property works as expected in a property set with a SwapChainPanel
-class CoreWindowSizeTest : public testing::Test,
-                           public testing::WithParamInterface<std::tuple<float, float, bool>>
+class CoreWindowSizeTest : public testing::TestWithParam<std::tuple<float, float, bool>>
 {
 };
 
@@ -350,8 +347,7 @@ typedef std::tuple<float, float, bool> sizeValidPair;
 static const sizeValidPair sizes[] = { sizeValidPair( 800,  480, true),
                                        sizeValidPair(   0,  480, false),
                                        sizeValidPair( 800,    0, false),
-                                       sizeValidPair(   0,    0, false),
-                                       sizeValidPair(4097, 4097, false)};
+                                       sizeValidPair(   0,    0, false) };
 
 INSTANTIATE_TEST_CASE_P(NativeWindowTest,
                         CoreWindowSizeTest,

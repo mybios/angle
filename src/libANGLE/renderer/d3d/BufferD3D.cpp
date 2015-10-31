@@ -10,7 +10,6 @@
 
 #include "common/utilities.h"
 #include "libANGLE/renderer/d3d/IndexBuffer.h"
-#include "libANGLE/vertexattribute.h"
 #include "libANGLE/renderer/d3d/VertexBuffer.h"
 
 namespace rx
@@ -20,29 +19,25 @@ unsigned int BufferD3D::mNextSerial = 1;
 
 BufferD3D::BufferD3D(BufferFactoryD3D *factory)
     : BufferImpl(),
-      mStaticIndexBuffer(nullptr),
-      mUseStaticBuffers(false),
       mFactory(factory),
-      mUnmodifiedIndexDataUse(0)
+      mStaticVertexBuffer(nullptr),
+      mStaticIndexBuffer(nullptr),
+      mUnmodifiedDataUse(0),
+      mUsage(D3D_BUFFER_USAGE_STATIC)
 {
     updateSerial();
 }
 
 BufferD3D::~BufferD3D()
 {
+    SafeDelete(mStaticVertexBuffer);
     SafeDelete(mStaticIndexBuffer);
 
-    // Clean up the static buffers for each attribute too.
-    for (StaticBufferIteratorType i = mStaticVertexBufferForAttributeMap.begin(); i != mStaticVertexBufferForAttributeMap.end(); i++)
+    // Empty the cache of static vertex buffers too
+    for (StaticVertexBufferInterface *staticBuffer : mStaticBufferCache)
     {
-        SafeDelete(i->second);
+        SafeDelete(staticBuffer);
     }
-}
-
-BufferD3D::AttribElement BufferD3D::CreateAttribElementFromAttrib(const gl::VertexAttribute &attrib)
-{
-    size_t attributeOffset = static_cast<size_t>(attrib.offset) % ComputeVertexAttributeStride(attrib);
-    return { attrib.type, attrib.size, static_cast<GLuint>(ComputeVertexAttributeStride(attrib)), attrib.normalized, attrib.pureInteger, attributeOffset };
 }
 
 void BufferD3D::updateSerial()
@@ -50,124 +45,135 @@ void BufferD3D::updateSerial()
     mSerial = mNextSerial++;
 }
 
-StaticVertexBufferInterface *BufferD3D::findStaticVertexBufferForAttribute(const gl::VertexAttribute &attrib)
+void BufferD3D::updateD3DBufferUsage(GLenum usage)
 {
-    AttribElement element = CreateAttribElementFromAttrib(attrib);
-
-    StaticBufferIteratorType mapElement = mStaticVertexBufferForAttributeMap.find(element);
-
-    // If we've already created a StaticVertexBufferInterface for this attribute, then we return it
-    if (mapElement != mStaticVertexBufferForAttributeMap.end())
+    switch (usage)
     {
-        return mapElement->second;
-    }
+        case GL_STATIC_DRAW:
+        case GL_STATIC_READ:
+        case GL_STATIC_COPY:
+            mUsage = D3D_BUFFER_USAGE_STATIC;
+            initializeStaticData();
+            break;
 
-    return NULL;
+        case GL_STREAM_DRAW:
+        case GL_STREAM_READ:
+        case GL_STREAM_COPY:
+        case GL_DYNAMIC_READ:
+        case GL_DYNAMIC_COPY:
+        case GL_DYNAMIC_DRAW:
+            mUsage = D3D_BUFFER_USAGE_DYNAMIC;
+            break;
+        default:
+            UNREACHABLE();
+    }
 }
 
-StaticVertexBufferInterface *BufferD3D::getStaticVertexBufferForAttribute(const gl::VertexAttribute &attrib)
+void BufferD3D::initializeStaticData()
 {
-    if (!mUseStaticBuffers)
-        return NULL;
-
-    if (attrib.type == GL_NONE)
-        return NULL;
-
-    StaticVertexBufferInterface *bufferForAttribute = findStaticVertexBufferForAttribute(attrib);
-    if (bufferForAttribute != NULL)
+    if (!mStaticVertexBuffer)
     {
-        return bufferForAttribute;
+        mStaticVertexBuffer = new StaticVertexBufferInterface(mFactory);
     }
-
-    // If we have too many static buffers (using up a lot of memory) then we should revert to streaming buffers.
-    // The exact memory usage of the static buffers is difficult to measure.
-    // Each static vertex buffer will say they are of size 0 until they are first used (which is when they are populated with data)
-    // We therefore use two metrics to try to limit the memory usage of these static buffers:
-    //      - If some of the static vertex buffers are populated with data, then we sum up their total size, and we don't create another
-    //        static buffer if their total size is 3x larger than the original buffer's size. "3x" could be made lower to save memory.
-    //      - We also set a high upper bound for the number of static vertex buffers that each buffer can create, to cover the case when
-    //        a lot of static buffers are created before many of them are populated with data.
-    if (mStaticVertexBufferForAttributeMap.size() <= 100)
-    {
-        size_t totalStaticBufferSize = 0;
-        for (StaticBufferIteratorType i = mStaticVertexBufferForAttributeMap.begin(); i != mStaticVertexBufferForAttributeMap.end(); i++)
-        {
-            // ASSERT against overflow
-            ASSERT(totalStaticBufferSize + i->second->getBufferSize() >= totalStaticBufferSize);
-            totalStaticBufferSize += i->second->getBufferSize();
-        }
-
-        if (totalStaticBufferSize <= 3 * getSize())
-        {
-            AttribElement element = CreateAttribElementFromAttrib(attrib);
-            bufferForAttribute = new StaticVertexBufferInterface(mFactory);
-            mStaticVertexBufferForAttributeMap[element] = bufferForAttribute;
-        }
-    }
-
-    return bufferForAttribute;
-}
-
-void BufferD3D::enableStaticData()
-{
-    mUseStaticBuffers = true;
-
     if (!mStaticIndexBuffer)
     {
         mStaticIndexBuffer = new StaticIndexBufferInterface(mFactory);
     }
 }
 
-void BufferD3D::invalidateStaticIndexData()
+StaticIndexBufferInterface *BufferD3D::getStaticIndexBuffer()
 {
-    if (mStaticIndexBuffer && mStaticIndexBuffer->getBufferSize() != 0)
-    {
-        SafeDelete(mStaticIndexBuffer);
+    return mStaticIndexBuffer;
+}
 
-        // Re-init static data to track that we're in a static buffer
-        enableStaticData();
+StaticVertexBufferInterface *BufferD3D::getStaticVertexBuffer(const gl::VertexAttribute &attribute)
+{
+    // If the default static vertex buffer contains the attribute, then return it
+    if (mStaticVertexBuffer && mStaticVertexBuffer->lookupAttribute(attribute, nullptr))
+    {
+        return mStaticVertexBuffer;
     }
 
-    mUnmodifiedIndexDataUse = 0;
+    // If there is a cached static buffer that already contains the attribute, then return it
+    for (StaticVertexBufferInterface *staticBuffer : mStaticBufferCache)
+    {
+        if (staticBuffer->lookupAttribute(attribute, nullptr))
+        {
+            return staticBuffer;
+        }
+    }
+
+    if (mStaticVertexBuffer)
+    {
+        // If the default static vertex buffer hasn't been committed, then we can
+        // still use it
+        if (!mStaticVertexBuffer->isCommitted())
+        {
+            return mStaticVertexBuffer;
+        }
+        else
+        {
+            // We can't reuse the default static vertex buffer, so we add it to the cache
+            mStaticBufferCache.push_back(mStaticVertexBuffer);
+            mStaticVertexBuffer = nullptr;
+
+            // Then reinitialize the static buffers to create a new static vertex buffer
+            initializeStaticData();
+        }
+    }
+
+    // Return the default static vertex buffer
+    return mStaticVertexBuffer;
+}
+
+void BufferD3D::invalidateStaticData()
+{
+    // Empty the cache of static vertex buffers too
+    for (StaticVertexBufferInterface *staticBuffer : mStaticBufferCache)
+    {
+        SafeDelete(staticBuffer);
+    }
+    mStaticBufferCache.clear();
+
+    if ((mStaticVertexBuffer && mStaticVertexBuffer->getBufferSize() != 0) || (mStaticIndexBuffer && mStaticIndexBuffer->getBufferSize() != 0))
+    {
+        SafeDelete(mStaticVertexBuffer);
+        SafeDelete(mStaticIndexBuffer);
+
+        // If the buffer was created with a static usage then we recreate the static
+        // buffers so that they are populated the next time we use this buffer.
+        if (mUsage == D3D_BUFFER_USAGE_STATIC)
+        {
+            initializeStaticData();
+        }
+    }
+
+    mUnmodifiedDataUse = 0;
 }
 
 // Creates static buffers if sufficient used data has been left unmodified
-void BufferD3D::promoteStaticIndexUsage(int dataSize)
+void BufferD3D::promoteStaticUsage(int dataSize)
 {
-    if (!mStaticIndexBuffer)
+    if (!mStaticVertexBuffer && !mStaticIndexBuffer)
     {
-        mUnmodifiedIndexDataUse += dataSize;
+        // There isn't any scenario that involves promoting static usage and the static buffer cache
+        // being non-empty
+        ASSERT(mStaticBufferCache.empty());
 
-        if (mUnmodifiedIndexDataUse > 3 * getSize())
+        mUnmodifiedDataUse += dataSize;
+
+        if (mUnmodifiedDataUse > 3 * getSize())
         {
-            mStaticIndexBuffer = new StaticIndexBufferInterface(mFactory);
+            initializeStaticData();
         }
     }
 }
 
-void BufferD3D::promoteStaticVertexUsageForAttrib(const gl::VertexAttribute &attrib, int dataSize)
-{
-    StaticVertexBufferInterface* bufferForAttribute = findStaticVertexBufferForAttribute(attrib);
-
-    if (bufferForAttribute == NULL)
-    {
-        AttribElement element = CreateAttribElementFromAttrib(attrib);
-
-        if (mUnmodifiedVertexDataUseMap.find(element) == mUnmodifiedVertexDataUseMap.end())
-        {
-            mUnmodifiedVertexDataUseMap[element] = 0;
-        }
-
-        mUnmodifiedVertexDataUseMap[element] += dataSize;
-
-        if (mUnmodifiedVertexDataUseMap[element] > 3 * getSize())
-        {
-            getStaticVertexBufferForAttribute(attrib);
-        }
-    }
-}
-
-gl::Error BufferD3D::getIndexRange(GLenum type, size_t offset, size_t count, gl::RangeUI *outRange)
+gl::Error BufferD3D::getIndexRange(GLenum type,
+                                   size_t offset,
+                                   size_t count,
+                                   bool primitiveRestartEnabled,
+                                   gl::IndexRange *outRange)
 {
     const uint8_t *data = nullptr;
     gl::Error error = getData(&data);
@@ -176,7 +182,7 @@ gl::Error BufferD3D::getIndexRange(GLenum type, size_t offset, size_t count, gl:
         return error;
     }
 
-    *outRange = gl::ComputeIndexRange(type, data + offset, count);
+    *outRange = gl::ComputeIndexRange(type, data + offset, count, primitiveRestartEnabled);
     return gl::Error(GL_NO_ERROR);
 }
 

@@ -10,12 +10,12 @@
 #ifndef LIBANGLE_RENDERER_D3D_D3D11_FORMATUTILS11_H_
 #define LIBANGLE_RENDERER_D3D_D3D11_FORMATUTILS11_H_
 
-#include "libANGLE/renderer/d3d/formatutilsD3D.h"
-#include "libANGLE/angletypes.h"
+#include <map>
 
 #include "common/platform.h"
-
-#include <map>
+#include "libANGLE/angletypes.h"
+#include "libANGLE/formatutils.h"
+#include "libANGLE/renderer/d3d/formatutilsD3D.h"
 
 namespace rx
 {
@@ -60,39 +60,22 @@ struct DXGIFormat
 };
 const DXGIFormat &GetDXGIFormatInfo(DXGI_FORMAT format);
 
-struct TextureFormat
-{
-    TextureFormat();
-
-    DXGI_FORMAT texFormat;
-    DXGI_FORMAT srvFormat;
-    DXGI_FORMAT rtvFormat;
-    DXGI_FORMAT dsvFormat;
-    DXGI_FORMAT renderFormat;
-
-    DXGI_FORMAT swizzleTexFormat;
-    DXGI_FORMAT swizzleSRVFormat;
-    DXGI_FORMAT swizzleRTVFormat;
-
-    InitializeTextureDataFunction dataInitializerFunction;
-
-    typedef std::map<GLenum, LoadImageFunction> LoadFunctionMap;
-    LoadFunctionMap loadFunctions;
-};
-const TextureFormat &GetTextureFormatInfo(GLenum internalFormat, const Renderer11DeviceCaps &renderer11DeviceCaps, bool renderable);
-
 struct VertexFormat
 {
     VertexFormat();
+    VertexFormat(VertexConversionType conversionType,
+                 DXGI_FORMAT nativeFormat,
+                 VertexCopyFunction copyFunction);
 
     VertexConversionType conversionType;
     DXGI_FORMAT nativeFormat;
     VertexCopyFunction copyFunction;
 };
-const VertexFormat &GetVertexFormatInfo(const gl::VertexFormat &vertexFormat, D3D_FEATURE_LEVEL featureLevel);
+const VertexFormat &GetVertexFormatInfo(gl::VertexFormatType vertexFormatType,
+                                        D3D_FEATURE_LEVEL featureLevel);
 
-}
+}  // namespace d3d11
 
-}
+}  // namespace rx
 
 #endif // LIBANGLE_RENDERER_D3D_D3D11_FORMATUTILS11_H_

@@ -54,8 +54,8 @@ class MockBufferFactoryD3D : public rx::BufferFactoryD3D
     }
 
     MOCK_METHOD0(createVertexBuffer, rx::VertexBuffer*());
-    MOCK_CONST_METHOD1(getVertexConversionType, rx::VertexConversionType(const gl::VertexFormat &));
-    MOCK_CONST_METHOD1(getVertexComponentType, GLenum(const gl::VertexFormat &));
+    MOCK_CONST_METHOD1(getVertexConversionType, rx::VertexConversionType(gl::VertexFormatType));
+    MOCK_CONST_METHOD1(getVertexComponentType, GLenum(gl::VertexFormatType));
 
     // Dependency injection
     rx::IndexBuffer* createIndexBuffer() override
@@ -98,8 +98,7 @@ class MockBufferD3D : public rx::BufferD3D
     MOCK_METHOD0(markTransformFeedbackUsage, void());
 
     // inlined for speed
-    bool supportsDirectVertexBindingForAttrib(const gl::VertexAttribute &) override { return false; }
-    bool supportsDirectIndexBinding() const override { return false; }
+    bool supportsDirectBinding() const override { return false; }
     size_t getSize() const override { return mData.size(); }
 
     gl::Error getData(const uint8_t **outData) override
@@ -131,9 +130,7 @@ MockBufferD3D *InitMockBufferD3D(MockBufferFactoryD3D *mockFactory)
     MockBufferD3D *mockBufferD3D = new MockBufferD3D(mockFactory);
 
     EXPECT_CALL(*mockFactory, createVertexBuffer()).WillOnce(Return(nullptr)).RetiresOnSaturation();
-    // mockBufferD3D->initializeStaticData();
-    ASSERT(false);
-    // TODO: aukinros understand this
+    mockBufferD3D->initializeStaticData();
 
     return mockBufferD3D;
 }
@@ -160,7 +157,8 @@ void IndexDataManagerPerfTest::step(float dt, double totalTime)
     rx::SourceIndexData sourceIndexData;
     for (unsigned int iteration = 0; iteration < 100; ++iteration)
     {
-        mIndexBuffer.getIndexRange(GL_UNSIGNED_SHORT, 0, mIndexCount, &translatedIndexData.indexRange);
+        mIndexBuffer.getIndexRange(GL_UNSIGNED_SHORT, 0, mIndexCount, false,
+                                   &translatedIndexData.indexRange);
         mIndexDataManager.prepareIndexData(GL_UNSIGNED_SHORT, mIndexCount, &mIndexBuffer, nullptr, &translatedIndexData, &sourceIndexData);
     }
 

@@ -43,7 +43,13 @@ class InspectableNativeWindow
     virtual ~InspectableNativeWindow(){}
 
     virtual bool initialize(EGLNativeWindowType window, IPropertySet *propertySet) = 0;
-    virtual HRESULT createSwapChain(ID3D11Device *device, DXGIFactory *factory, DXGI_FORMAT format, unsigned int width, unsigned int height, DXGISwapChain **swapChain) = 0;
+    virtual HRESULT createSwapChain(ID3D11Device *device,
+                                    DXGIFactory *factory,
+                                    DXGI_FORMAT format,
+                                    unsigned int width,
+                                    unsigned int height,
+                                    bool containsAlpha,
+                                    DXGISwapChain **swapChain) = 0;
 
     bool getClientRect(RECT *rect)
     {
@@ -88,7 +94,7 @@ class InspectableNativeWindow
         }
     }
 
-protected:
+  protected:
     virtual HRESULT scaleSwapChain(const SIZE &windowSize, const RECT &clientRect) = 0;
 
     bool mSupportsSwapChainResize; // Support for IDXGISwapChain::ResizeBuffers method
@@ -107,15 +113,15 @@ bool IsCoreWindow(EGLNativeWindowType window, ComPtr<ABI::Windows::UI::Core::ICo
 bool IsSwapChainPanel(EGLNativeWindowType window, ComPtr<ABI::Windows::UI::Xaml::Controls::ISwapChainPanel> *swapChainPanel = nullptr);
 bool IsEGLConfiguredPropertySet(EGLNativeWindowType window, ABI::Windows::Foundation::Collections::IPropertySet **propertySet = nullptr, IInspectable **inspectable = nullptr);
 
-HRESULT GetOptionalPropertyValue(const ComPtr<ABI::Windows::Foundation::Collections::IMap<HSTRING, IInspectable*>>& propertyMap,
+HRESULT GetOptionalPropertyValue(const ComPtr<ABI::Windows::Foundation::Collections::IMap<HSTRING, IInspectable*>> &propertyMap,
                                  const wchar_t *propertyName,
                                  boolean *hasKey,
-                                 ComPtr<ABI::Windows::Foundation::IPropertyValue>& propertyValue);
+                                 ComPtr<ABI::Windows::Foundation::IPropertyValue> &propertyValue);
 
-HRESULT GetOptionalSizePropertyValue(const ComPtr<ABI::Windows::Foundation::Collections::IMap<HSTRING, IInspectable*>>& propertyMap,
+HRESULT GetOptionalSizePropertyValue(const ComPtr<ABI::Windows::Foundation::Collections::IMap<HSTRING, IInspectable*>> &propertyMap,
                                      const wchar_t *propertyName, SIZE *value, bool *valueExists);
 
-HRESULT GetOptionalSinglePropertyValue(const ComPtr<ABI::Windows::Foundation::Collections::IMap<HSTRING, IInspectable*>>& propertyMap,
+HRESULT GetOptionalSinglePropertyValue(const ComPtr<ABI::Windows::Foundation::Collections::IMap<HSTRING, IInspectable*>> &propertyMap,
                                        const wchar_t *propertyName, float *value, bool *valueExists);
 }
 
