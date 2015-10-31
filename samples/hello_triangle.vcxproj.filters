@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <Filter Include="hello_triangle">
@@ -9,6 +9,26 @@
     <ClCompile Include="hello_triangle\HelloTriangle.cpp">
       <Filter>hello_triangle</Filter>
     </ClCompile>
-    <None Include="samples.gyp"/>
+    <None Include="samples.gyp" />
+    <ClCompile Include="hello_triangle\MemoryDataStream.cpp">
+      <Filter>hello_triangle</Filter>
+    </ClCompile>
+    <ClCompile Include="hello_triangle\BinarySerializer.cpp">
+      <Filter>hello_triangle</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="hello_triangle\ByteOrder.h">
+      <Filter>hello_triangle</Filter>
+    </ClInclude>
+    <ClInclude Include="hello_triangle\MemoryDataStream.h">
+      <Filter>hello_triangle</Filter>
+    </ClInclude>
+    <ClInclude Include="hello_triangle\BinarySerializer.h">
+      <Filter>hello_triangle</Filter>
+    </ClInclude>
+    <ClInclude Include="hello_triangle\Types.h">
+      <Filter>hello_triangle</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

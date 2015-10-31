@@ -1,0 +1,309 @@
+material Default2DMaterial
+{
+    renderState
+    {
+	blend = true
+	blendSrc = ONE
+	blendDst = ONE_MINUS_SRC_ALPHA
+        cullFace = false
+        depthTest = false
+        stencilTest = false
+    }
+}
+material Default3DMaterial
+{
+    renderState
+    {
+	blend = true
+	blendSrc = ONE
+	blendDst = ONE_MINUS_SRC_ALPHA
+        cullFace = false
+        depthTest = true
+	depthWrite = true
+    }
+}
+
+
+material ShaderPositionTextureColor : Default2DMaterial
+{
+    technique
+    {
+        pass 
+        {
+            vertexShader = preload/shaders/ccShader_PositionTextureColor.vert
+            fragmentShader = preload/shaders/ccShader_PositionTextureColor.frag
+        }
+    }
+}
+
+
+material ShaderPositionTextureColor3D : Default3DMaterial
+{
+    technique
+    {
+        pass 
+        {
+            vertexShader = preload/shaders/ccShader_PositionTextureColor.vert
+            fragmentShader = preload/shaders/ccShader_PositionTextureColor.frag
+        }
+    }
+}
+
+material ShaderPositionTextureColor_noMVP : Default2DMaterial
+{
+    technique
+    {
+        pass 
+        {
+            vertexShader = preload/shaders/ccShader_PositionTextureColor_noMVP.vert
+            fragmentShader = preload/shaders/ccShader_PositionTextureColor_noMVP.frag
+        }
+    }
+}
+
+
+
+material ShaderPositionTextureColorAlphaTest : Default2DMaterial
+{
+    technique
+    {
+        pass 
+        {
+            vertexShader = preload/shaders/ccShader_PositionTextureColor.vert
+            fragmentShader = preload/shaders/ccShader_PositionTextureColorAlphaTest.frag
+        }
+    }
+}
+
+
+material ShaderPositionTextureColorAlphaTest_NoMV : Default2DMaterial
+{
+    technique
+    {
+        pass 
+        {
+            vertexShader = preload/shaders/ccShader_PositionTextureColor_noMVP.vert
+            fragmentShader = preload/shaders/ccShader_PositionTextureColorAlphaTest.frag
+        }
+    }
+}
+
+
+material ShaderPositionColor : Default2DMaterial
+{
+    technique
+    {
+        pass 
+        {
+            vertexShader = preload/shaders/ccShader_PositionColor.vert
+            fragmentShader = preload/shaders/ccShader_PositionColor.frag
+        }
+    }
+}
+
+
+
+material ShaderPositionColor3D : Default3DMaterial
+{
+    technique
+    {
+        pass 
+        {
+            vertexShader = preload/shaders/ccShader_PositionColor.vert
+            fragmentShader = preload/shaders/ccShader_PositionColor.frag
+        }
+    }
+}
+
+
+material ShaderPositionColor3DTrans
+{
+    renderState
+    {
+	blend = true
+	blendSrc = SRC_ALPHA
+	blendDst = ONE_MINUS_SRC_ALPHA
+        cullFace = false
+        depthTest = true
+	depthWrite = false
+    }
+
+    technique
+    {
+        pass 
+        {
+            vertexShader = preload/shaders/ccShader_PositionColor.vert
+            fragmentShader = preload/shaders/ccShader_PositionColor.frag
+        }
+    }
+}
+
+material ShaderPositionColor_noMVP : Default2DMaterial
+{
+    technique
+    {
+        pass 
+        {
+            vertexShader = preload/shaders/ccShader_PositionTextureColor_noMVP.vert
+            fragmentShader = preload/shaders/ccShader_PositionColor.frag
+        }
+    }
+}
+
+
+material ShaderPositionTexture : Default2DMaterial
+{
+    technique
+    {
+        pass 
+        {
+            vertexShader = preload/shaders/ccShader_PositionTexture.vert
+            fragmentShader = preload/shaders/ccShader_PositionTexture.frag
+        }
+    }
+}
+
+
+material ShaderPositionTexture_uColor : Default2DMaterial
+{
+    technique
+    {
+        pass 
+        {
+            vertexShader = preload/shaders/ccShader_PositionTexture_uColor.vert
+            fragmentShader = preload/shaders/ccShader_PositionTexture_uColor.frag
+        }
+    }
+}
+
+
+material ShaderPositionTextureA8Color : Default2DMaterial
+{
+    technique
+    {
+        pass 
+        {
+            vertexShader = preload/shaders/ccShader_PositionTextureA8Color.vert
+            fragmentShader = preload/shaders/ccShader_PositionTextureA8Color.frag
+        }
+    }
+}
+
+
+material ShaderPosition_uColor : Default2DMaterial
+{
+    technique
+    {
+        pass 
+        {
+            vertexShader = preload/shaders/ccShader_Position_uColor.vert
+            fragmentShader = preload/shaders/ccShader_Position_uColor.frag
+        }
+    }
+}
+
+material ShaderPosition_uColor3D : Default3DMaterial
+{
+    technique
+    {
+        pass 
+        {
+            vertexShader = preload/shaders/ccShader_Position_uColor.vert
+            fragmentShader = preload/shaders/ccShader_Position_uColor.frag
+        }
+    }
+}
+
+material ShaderPositionLengthTextureColor : Default2DMaterial
+{
+    technique
+    {
+        pass 
+        {
+            vertexShader = preload/shaders/ccShader_PositionColorLengthTexture.vert
+            fragmentShader = preload/shaders/ccShader_PositionColorLengthTexture.frag
+        }
+    }
+}
+
+material ShaderLabelDFNormal : Default2DMaterial
+{
+    technique
+    {
+        pass 
+        {
+            vertexShader = preload/shaders/ccShader_Label.vert
+            fragmentShader = preload/shaders/ccShader_Label_df.frag
+        }
+    }
+}
+
+
+material ShaderLabelDFGlow : Default2DMaterial
+{
+    technique
+    {
+        pass 
+        {
+            vertexShader = preload/shaders/ccShader_Label.vert
+            fragmentShader = preload/shaders/ccShader_Label_df_glow.frag
+        }
+    }
+}
+
+
+material ShaderLabelNormal : Default2DMaterial
+{
+    technique
+    {
+        pass 
+        {
+            vertexShader = preload/shaders/ccShader_Label.vert
+            fragmentShader = preload/shaders/ccShader_Label_normal.frag
+        }
+    }
+}
+
+
+material ShaderLabelOutline : Default2DMaterial
+{
+    technique
+    {
+        pass 
+        {
+            vertexShader = preload/shaders/ccShader_Label.vert
+            fragmentShader = preload/shaders/ccShader_Label_outline_border.frag
+        }
+        pass 
+        {
+            vertexShader = preload/shaders/ccShader_Label.vert
+            fragmentShader = preload/shaders/ccShader_Label_outline_font.frag
+        }
+    }
+}
+
+
+material Shader3DPosition : Default2DMaterial
+{
+    technique
+    {
+        pass 
+        {
+            vertexShader = preload/shaders/ccShader_3D_PositionTex.vert
+            fragmentShader = preload/shaders/ccShader_3D_Color.frag
+        }
+    }
+}
+
+
+material Shader3DPositionTexture : Default2DMaterial
+{
+    technique
+    {
+        pass 
+        {
+            vertexShader = preload/shaders/ccShader_3D_PositionTex.vert
+            fragmentShader = preload/shaders/ccShader_3D_ColorTex.frag
+        }
+    }
+}

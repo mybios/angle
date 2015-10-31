@@ -145,10 +145,10 @@ gl::Error VertexArrayGL::syncDrawState(GLint first, GLsizei count, GLenum type, 
     {
         ASSERT(attributesNeedStreaming);
 
-        gl::Error error = streamAttributes(streamingDataSize, maxAttributeDataSize, indexRange);
-        if (error.isError())
+        gl::Error error1 = streamAttributes(streamingDataSize, maxAttributeDataSize, indexRange);
+        if (error1.isError())
         {
-            return error;
+            return error1;
         }
     }
 

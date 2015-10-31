@@ -10,9 +10,9 @@
 #if defined(_WIN32) || defined(_WIN64)
 
 #if defined(ANGLE_TRANSLATOR_IMPLEMENTATION)
-#define COMPILER_EXPORT __declspec(dllexport)
+#define COMPILER_EXPORT
 #else
-#define COMPILER_EXPORT __declspec(dllimport)
+#define COMPILER_EXPORT
 #endif  // defined(ANGLE_TRANSLATOR_IMPLEMENTATION)
 
 #else  // defined(_WIN32) || defined(_WIN64)
